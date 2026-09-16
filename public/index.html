@@ -362,8 +362,6 @@ function renderDetail(){
     h+=`</tbody></table></div>`;
   }
 
-  h+=`<div class="sec"><h3>요청 헤더</h3><div class="hdrs"><b>Authorization</b>: Bearer &lt;키&gt;${c.body?`<br><b>Content-Type</b>: application/json`:""}</div></div>`;
-
   if(c.bodyFields){
     h+=`<div class="sec"><h3>요청 필드</h3><table><thead><tr><th>필드</th><th>값</th><th>타입</th><th>필수</th><th>설명</th></tr></thead><tbody>`;
     c.bodyFields.forEach(f=>{
@@ -376,6 +374,8 @@ function renderDetail(){
     h+=`</tbody></table>
       ${c.fileTarget?`<div class="file"><input type="file" data-file><span>선택하면 base64로 인코딩해 documents[].data / filename / format 값을 채웁니다</span></div>`:""}</div>`;
   }
+
+  h+=`<div class="sec"><h3>요청 헤더</h3><div class="hdrs"><b>Authorization</b>: Bearer &lt;키&gt;${c.body?`<br><b>Content-Type</b>: application/json`:""}</div></div>`;
 
   if(c.respFields){
     h+=`<div class="sec"><h3>응답 필드 (${c.success})</h3><table><thead><tr><th>필드</th><th>타입</th><th>설명</th></tr></thead><tbody>`;
