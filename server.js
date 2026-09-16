@@ -19,6 +19,7 @@ try {
 
 const proxy = (await import("./api/proxy.js")).default;
 const callback = (await import("./api/callback.js")).default;
+const config = (await import("./api/config.js")).default;
 
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml" };
 
@@ -43,6 +44,7 @@ createServer(async (req, res) => {
 
   if (url.pathname === "/api/proxy") { adapt(req, res, query, body); return proxy(req, res); }
   if (url.pathname === "/api/callback") { adapt(req, res, query, body); return callback(req, res); }
+  if (url.pathname === "/api/config") { adapt(req, res, query, body); return config(req, res); }
 
   // 정적 파일 (public/)
   const path = url.pathname === "/" ? "/index.html" : url.pathname;
