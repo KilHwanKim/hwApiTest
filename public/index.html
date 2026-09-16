@@ -269,12 +269,12 @@ function renderDetail(){
     <p class="desc">${c.desc}</p>`;
 
   if(pps.length){
-    h+=`<div class="sec"><h3>경로 파라미터</h3><table><thead><tr><th>파라미터</th><th>값</th><th>설명</th></tr></thead><tbody>`;
+    h+=`<div class="sec"><h3>요청 필드</h3><table><thead><tr><th>필드</th><th>값</th><th>설명</th></tr></thead><tbody>`;
     pps.forEach(p=>{ h+=`<tr><td class="k">${p.k}</td><td><input class="pi" data-pp="${p.k}" placeholder="${p.k}"></td><td class="opt">${p.d||""}</td></tr>`; });
     h+=`</tbody></table></div>`;
   }
   if(c.query){
-    h+=`<div class="sec"><h3>쿼리 파라미터</h3><table><thead><tr><th>파라미터</th><th>값</th><th>설명</th></tr></thead><tbody>`;
+    h+=`<div class="sec"><h3>요청 필드</h3><table><thead><tr><th>필드</th><th>값</th><th>설명</th></tr></thead><tbody>`;
     c.query.forEach(q=>{ h+=`<tr><td class="k">${q.k}</td><td><input class="pi" data-q="${q.k}" value="${q.v}" placeholder="${q.k}"></td><td class="opt">${q.d||""}</td></tr>`; });
     h+=`</tbody></table></div>`;
   }
@@ -282,13 +282,15 @@ function renderDetail(){
   h+=`<div class="sec"><h3>요청 헤더</h3><div class="hdrs"><b>Authorization</b>: Bearer &lt;키&gt;${c.body?`<br><b>Content-Type</b>: application/json`:""}</div></div>`;
 
   if(c.bodyFields){
-    h+=`<div class="sec"><h3>요청 본문 필드</h3><table><thead><tr><th>필드</th><th>타입</th><th>필수</th><th>설명</th></tr></thead><tbody>`;
-    c.bodyFields.forEach(f=>{ h+=`<tr><td class="k">${f.k}</td><td class="type">${f.t}</td><td>${f.req?'<span class="req">필수</span>':'<span class="opt">선택</span>'}</td><td class="opt">${f.d}</td></tr>`; });
-    h+=`</tbody></table></div>`;
-  }
-  if(c.body){
-    h+=`<div class="sec"><h3>요청 본문 (JSON · 편집 가능)</h3><textarea data-body>${esc(JSON.stringify(c.body,null,2))}</textarea>
-      ${c.fileTarget?`<div class="file"><input type="file" data-file><span>선택하면 base64로 인코딩해 documents[0].data에 넣습니다</span></div>`:""}</div>`;
+    h+=`<div class="sec"><h3>요청 필드</h3><table><thead><tr><th>필드</th><th>값</th><th>타입</th><th>필수</th><th>설명</th></tr></thead><tbody>`;
+    c.bodyFields.forEach(f=>{
+      const cell = f.k==="documents"
+        ? `<span class="opt">배열 · 아래 documents[].* 값으로 구성</span>`
+        : `<input class="pi" data-bf="${f.k}" value="${esc(bfDefault(c,f.k))}" placeholder="${f.k}">`;
+      h+=`<tr><td class="k">${f.k}</td><td>${cell}</td><td class="type">${f.t}</td><td>${f.req?'<span class="req">필수</span>':'<span class="opt">선택</span>'}</td><td class="opt">${f.d}</td></tr>`;
+    });
+    h+=`</tbody></table>
+      ${c.fileTarget?`<div class="file"><input type="file" data-file><span>선택하면 base64로 인코딩해 documents[].data / filename / format 값을 채웁니다</span></div>`:""}</div>`;
   }
 
   // 파일(base64) 업로드 화면은 본문이 너무 커 cmd 한 줄 제한(8191자)에 안 맞으므로 cURL 버튼 숨김
@@ -312,6 +314,28 @@ function buildUrl(){
 }
 function headers(){ const h={}; const t=token.value.trim(); if(t) h["Authorization"]="Bearer "+t; return h; }
 
+// 본문 필드 기본값(샘플 body에서). documents[].x 는 documents[0].x 로 매핑
+function bfDefault(c,k){
+  const b=c.body||{};
+  if(k==="documents") return "";
+  if(k.startsWith("documents[].")){ const key=k.slice(12); return (b.documents&&b.documents[0]&&b.documents[0][key])||""; }
+  return b[k]||"";
+}
+// 화면의 input 값으로 요청 본문 JSON 조립 (빈 값은 생략)
+function buildBody(){
+  const c=ENDPOINTS[selected]; if(!c.bodyFields) return {};
+  const obj={}; let doc=null;
+  c.bodyFields.forEach(f=>{
+    if(f.k==="documents") return;
+    const el=$(`[data-bf="${f.k}"]`,detail); if(!el) return;
+    const v=el.value.trim(); if(v==="") return;
+    if(f.k.startsWith("documents[].")){ doc=doc||{}; doc[f.k.slice(12)]=v; }
+    else obj[f.k]=v;
+  });
+  if(doc) obj.documents=[doc];
+  return obj;
+}
+
 function showSample(c){
   const resp=$(".resp",detail), st=$(".status",detail), pre=$("pre",detail);
   if(!c.sample){ resp.style.display="none"; return; }
@@ -326,8 +350,7 @@ async function call(){
   const c=ENDPOINTS[selected], btn=$("[data-act='call']",detail);
   const st=$(".status",detail), pre=$("pre",detail), rh=$(".rh",detail);
   const url=buildUrl(), opts={ method:c.method, headers:headers() };
-  if(c.body){ const ta=$("[data-body]",detail); try{ JSON.parse(ta.value); }catch(e){ toast("요청 본문 JSON 오류"); return; }
-    opts.headers["Content-Type"]="application/json"; opts.body=ta.value; }
+  if(c.bodyFields){ opts.headers["Content-Type"]="application/json"; opts.body=JSON.stringify(buildBody()); }
   btn.disabled=true; btn.textContent="호출 중…";
   st.innerHTML=`<span class="meta">${c.method} ${esc(url)}</span>`; pre.textContent=""; rh.textContent="";
   const t0=performance.now();
@@ -347,10 +370,10 @@ async function call(){
 
 function injectFile(input){
   const f=input.files[0]; if(!f) return; const r=new FileReader();
-  r.onload=()=>{ const b64=(r.result.split(",")[1]||""); const ta=$("[data-body]",detail);
-    let obj; try{ obj=JSON.parse(ta.value); }catch(e){ toast("본문 JSON을 먼저 고쳐주세요"); return; }
-    obj.documents=obj.documents||[]; obj.documents[0]={ filename:f.name, format:fmtGuess(f.name), data:b64 };
-    ta.value=JSON.stringify(obj,null,2); toast(`${f.name} → base64 삽입 (${b64.length.toLocaleString()}자)`); };
+  r.onload=()=>{ const b64=(r.result.split(",")[1]||"");
+    const set=(k,v)=>{ const el=$(`[data-bf="documents[].${k}"]`,detail); if(el) el.value=v; };
+    set("filename",f.name); set("format",fmtGuess(f.name)); set("data",b64);
+    toast(`${f.name} → base64 삽입 (${b64.length.toLocaleString()}자)`); };
   r.readAsDataURL(f);
 }
 
@@ -362,10 +385,9 @@ function copyCurl(){
   const c=ENDPOINTS[selected];
   let s=`curl -X ${c.method} "${buildUrl()}"`;
   const t=token.value.trim(); if(t) s+=` -H "Authorization: Bearer ${t}"`;
-  if(c.body){
+  if(c.bodyFields){
     s+=` -H "Content-Type: application/json"`;
-    const raw=$("[data-body]",detail).value;
-    let json; try{ json=JSON.stringify(JSON.parse(raw)); }catch(e){ json=raw.replace(/\n\s*/g," "); }
+    const json=JSON.stringify(buildBody());
     s+=` -d "${json.replace(/"/g,'\\"')}"`;
   }
   navigator.clipboard.writeText(s).then(()=>toast("cURL 복사됨 · cmd에 붙여넣어 실행")).catch(()=>toast("복사 실패"));
